@@ -20,6 +20,8 @@ limitations under the License.
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/framework/tensor_types.h"
 #include "tensorflow/core/lib/hash/hash.h"
+#include "tensorflow/core/framework/op.h"
+#include "tensorflow/core/framework/op_kernel.h"
 
 namespace tensorflow {
 namespace functor {
@@ -53,6 +55,20 @@ struct MatMulFunctor {
 };
 
 }  // end namespace functor
+
+template <typename Device, typename T, bool USE_CUBLAS>
+class MatMulOp : public OpKernel {
+ public:
+  explicit MatMulOp(OpKernelConstruction* ctx);
+  void Compute(OpKernelContext* ctx) override;
+
+ private:
+  std::vector<int64> algorithms_;
+  bool algorithms_set_already_;
+  bool use_autotune_;
+  bool transpose_a_;
+  bool transpose_b_;
+};
 
 #if GOOGLE_CUDA
 // Encapsulate all the shape information that is used in matmul operations.

@@ -441,9 +441,7 @@ struct LaunchMatMul<GPUDevice, T, true /* USE_CUBLAS */> {
 #endif  // GOOGLE_CUDA
 
 template <typename Device, typename T, bool USE_CUBLAS>
-class MatMulOp : public OpKernel {
- public:
-  explicit MatMulOp(OpKernelConstruction* ctx)
+  MatMulOp<Device, T, USE_CUBLAS>::MatMulOp(OpKernelConstruction* ctx)
       : OpKernel(ctx), algorithms_set_already_(false) {
     OP_REQUIRES_OK(ctx, ctx->GetAttr("transpose_a", &transpose_a_));
     OP_REQUIRES_OK(ctx, ctx->GetAttr("transpose_b", &transpose_b_));
@@ -453,10 +451,12 @@ class MatMulOp : public OpKernel {
     use_autotune_ = MatmulAutotuneEnable();
   }
 
-  void Compute(OpKernelContext* ctx) override {
+template <typename Device, typename T, bool USE_CUBLAS>
+void MatMulOp<Device, T, USE_CUBLAS>::Compute(OpKernelContext* ctx) {
     const Tensor& a = ctx->input(0);
     const Tensor& b = ctx->input(1);
 
+    printf("call into MatmulOp compute \n");
     // Check that the dimensions of the two matrices are valid.
     OP_REQUIRES(ctx, TensorShapeUtils::IsMatrix(a.shape()),
                 errors::InvalidArgument("In[0] is not a matrix"));
@@ -496,14 +496,6 @@ class MatMulOp : public OpKernel {
     LaunchMatMul<Device, T, USE_CUBLAS>::launch(
         ctx, a, b, dim_pair, &algorithms_, use_autotune_, out);
   }
-
- private:
-  std::vector<int64> algorithms_;
-  bool algorithms_set_already_;
-  bool use_autotune_;
-  bool transpose_a_;
-  bool transpose_b_;
-};
 
 namespace functor {
 

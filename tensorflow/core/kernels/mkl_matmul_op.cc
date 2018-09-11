@@ -58,6 +58,7 @@ class MklMatMulOp : public OpKernel {
   explicit MklMatMulOp(OpKernelConstruction* ctx) : OpKernel(ctx) {
     OP_REQUIRES_OK(ctx, ctx->GetAttr("transpose_a", &transpose_a_));
     OP_REQUIRES_OK(ctx, ctx->GetAttr("transpose_b", &transpose_b_));
+    MatMulOp<Device, T, USE_CUBLAS> *_op = new MatMulOp<Device, T, USE_CUBLAS>(ctx);
   }
 
   void Compute(OpKernelContext* ctx) override {
@@ -101,11 +102,14 @@ class MklMatMulOp : public OpKernel {
     }
 
     if(DisableMKL()) {    //eigen path if MKL is disabled
-      printf("Using eigen matmul! \n");
-      //op->Compute(ctx);
+      printf("Using eigen MatMulOp  matmul! _op = %x \n", _op);
+      _op->Compute(ctx);
+      printf("after eigen MatMulOp  matmul! \n");
+      /*
       ::tensorflow::functor::MatMulFunctor<Device, T>()(ctx->eigen_device<Device>(),
                                       out->matrix<T>(), a.matrix<T>(),
                                              b.matrix<T>(), dim_pair);
+      */
     }
     else {     //MKL path
 
@@ -127,6 +131,7 @@ class MklMatMulOp : public OpKernel {
  private:
   bool transpose_a_;
   bool transpose_b_;
+  MatMulOp<Device, T, USE_CUBLAS> *_op;
 
   // --------------------------------------------------------------------------
   //
