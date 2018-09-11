@@ -456,7 +456,6 @@ void MatMulOp<Device, T, USE_CUBLAS>::Compute(OpKernelContext* ctx) {
     const Tensor& a = ctx->input(0);
     const Tensor& b = ctx->input(1);
 
-    printf("call into MatmulOp compute \n");
     // Check that the dimensions of the two matrices are valid.
     OP_REQUIRES(ctx, TensorShapeUtils::IsMatrix(a.shape()),
                 errors::InvalidArgument("In[0] is not a matrix"));
