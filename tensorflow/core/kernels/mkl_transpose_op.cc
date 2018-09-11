@@ -21,6 +21,7 @@ limitations under the License.
 #include "mkl_trans.h"
 #include "tensorflow/core/kernels/transpose_functor.h"
 #include "tensorflow/core/kernels/transpose_op.h"
+#include "tensorflow/core/util/util.h"
 
 namespace tensorflow {
 
@@ -98,7 +99,7 @@ static const char kMKLConjugateTranspose = 'C';
 Status MklTransposeCpuOp::DoTranspose(OpKernelContext* ctx, const Tensor& in,
                                       gtl::ArraySlice<int32> perm,
                                       Tensor* out) {
-  if (in.dims() == 2) {
+  if (!DisableMKL() && (in.dims() == 2)) {
     if (perm[0] == 0 && perm[1] == 1) {
       return Status::OK();
     }
@@ -115,7 +116,8 @@ Status MklTransposeCpuOp::DoTranspose(OpKernelContext* ctx, const Tensor& in,
         break;
     }
   }
-  // Fallback to eigen if transpose parameters not supported by MKL
+  // Fallback to eigen if transpose parameters not supported by MKL or MKL is
+  // disabled by env variable
   typedef Eigen::ThreadPoolDevice CPUDevice;
   return ::tensorflow::DoTranspose(ctx->eigen_device<CPUDevice>(), in, perm,
                                    out);
@@ -125,7 +127,7 @@ Status MklConjugateTransposeCpuOp::DoTranspose(OpKernelContext* ctx,
                                                const Tensor& in,
                                                gtl::ArraySlice<int32> perm,
                                                Tensor* out) {
-  if (in.dims() == 2 && perm[0] == 1 && perm[1] == 0) {
+  if (!DisableMKL() && (in.dims() == 2 && perm[0] == 1 && perm[1] == 0)) {
     // TODO(rmlarsen): By setting lda and ldb, we could use the MKL kernels
     // for any transpose that can be reduced to swapping the last two
     // dimensions in a rank-3 tensor. We can even run each outer dimension in

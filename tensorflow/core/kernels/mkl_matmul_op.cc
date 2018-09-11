@@ -30,10 +30,27 @@ limitations under the License.
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/register_types.h"
 #include "tensorflow/core/kernels/fill_functor.h"
+#include "tensorflow/core/kernels/matmul_op.h"
+#include "tensorflow/core/util/util.h"
 
 namespace tensorflow {
 
 typedef Eigen::ThreadPoolDevice CPUDevice;
+
+namespace functor {
+
+// Partial specialization MatMulFunctor<Device=CPUDevice, T>.
+template <typename T>
+struct MatMulFunctor<CPUDevice, T> {
+  void operator()(
+      const CPUDevice& d, typename MatMulTypes<T>::out_type out,
+      typename MatMulTypes<T>::in_type in0,
+      typename MatMulTypes<T>::in_type in1,
+      const Eigen::array<Eigen::IndexPair<Eigen::DenseIndex>, 1>& dim_pair) {
+    MatMul<CPUDevice>(d, out, in0, in1, dim_pair);
+  }
+};
+}  // end namespace functor
 
 template <typename Device, typename T, bool USE_CUBLAS>
 class MklMatMulOp : public OpKernel {
@@ -83,18 +100,28 @@ class MklMatMulOp : public OpKernel {
       return;
     }
 
-    const int m = a.dim_size(1 - dim_pair[0].first);
-    const int k = a.dim_size(dim_pair[0].first);
-    const int n = b.dim_size(1 - dim_pair[0].second);
-    bool transpose_a = dim_pair[0].first == 0;
-    bool transpose_b = dim_pair[0].second == 1;
+    if(DisableMKL()) {    //eigen path if MKL is disabled
+      printf("Using eigen matmul! \n");
+      //op->Compute(ctx);
+      ::tensorflow::functor::MatMulFunctor<Device, T>()(ctx->eigen_device<Device>(),
+                                      out->matrix<T>(), a.matrix<T>(),
+                                             b.matrix<T>(), dim_pair);
+    }
+    else {     //MKL path
 
-    auto a_ptr = (a.template flat<T>().data());
-    auto b_ptr = (b.template flat<T>().data());
-    auto c_ptr = (out->template flat<T>().data());
+      const int m = a.dim_size(1 - dim_pair[0].first);
+      const int k = a.dim_size(dim_pair[0].first);
+      const int n = b.dim_size(1 - dim_pair[0].second);
+      bool transpose_a = dim_pair[0].first == 0;
+      bool transpose_b = dim_pair[0].second == 1;
 
-    MklBlasGemm(transpose_a, transpose_b, m, n, k, a_ptr, transpose_a ? m : k,
-                b_ptr, transpose_b ? k : n, c_ptr, n);
+      auto a_ptr = (a.template flat<T>().data());
+      auto b_ptr = (b.template flat<T>().data());
+      auto c_ptr = (out->template flat<T>().data());
+
+      MklBlasGemm(transpose_a, transpose_b, m, n, k, a_ptr, transpose_a ? m : k,
+                  b_ptr, transpose_b ? k : n, c_ptr, n);
+    }
   }
 
  private:

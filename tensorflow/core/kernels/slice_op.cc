@@ -31,6 +31,7 @@ limitations under the License.
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/lib/gtl/array_slice.h"
 #include "tensorflow/core/platform/prefetch.h"
+#include "tensorflow/core/util/util.h"
 
 namespace tensorflow {
 
@@ -338,8 +339,8 @@ class MklSliceOp : public OpKernel {
     // differs from the input tensor in only 1 out of 4 dimensions.
     // This case arises in the context of Slice of 4-D tensor in NHWC or NCHW
     // format over channel dimension.
-    if (NDIM == 4 &&
-        DoesSliceShapeDifferInOnly1D(in_shape, begin, size, &slice_dim)) {
+    if (!DisableMKL() && (NDIM == 4 &&
+        DoesSliceShapeDifferInOnly1D(in_shape, begin, size, &slice_dim))) {
       size_t in_strides[4] = {
           (size_t)in_shape.dim_size(1) * in_shape.dim_size(2) *
               in_shape.dim_size(3),
